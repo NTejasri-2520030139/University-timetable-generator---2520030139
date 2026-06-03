@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Login — UniSchedule</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="logo-icon">🗓️</div>
+      UniSchedule
+    </div>
+    <h1 class="auth-title">Welcome back</h1>
+    <p class="auth-subtitle">Sign in to your account to continue</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ 'danger' if category == 'error' else category }}" style="margin-bottom:16px">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('login') }}">
+      <div class="form-group">
+        <label class="form-label">Email Address</label>
+        <div class="input-group">
+          <span class="input-icon">✉️</span>
+          <input class="form-control" type="email" name="email" placeholder="you@university.edu" required autocomplete="email">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <div class="input-group">
+          <span class="input-icon">🔒</span>
+          <input class="form-control" type="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary w-full" style="justify-content:center;margin-top:8px;padding:12px">
+        Sign In →
+      </button>
+    </form>
+
+    <p style="text-align:center;margin-top:20px;font-size:.84rem;color:rgba(255,255,255,.4)">
+      Don't have an account?
+      <a href="{{ url_for('register') }}" style="color:#818cf8;font-weight:600">Register here</a>
+    </p>
+    <p style="text-align:center;margin-top:8px;font-size:.78rem;color:rgba(255,255,255,.2)">
+      <a href="{{ url_for('landing') }}" style="color:inherit">← Back to home</a>
+    </p>
+
+    <!-- Demo credentials hint -->
+    <div style="margin-top:24px;padding:14px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);border-radius:10px;font-size:.75rem;color:rgba(255,255,255,.45)">
+      <strong style="color:#818cf8">Demo:</strong> Register as a Teacher to generate timetables, or as a Student to view them.
+    </div>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

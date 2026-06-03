@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="description" content="Smart University Timetable Generator using CSP — Backtracking, AC-3, MRV, Degree Heuristic, LCV">
+<title>{% block title %}Smart Timetable{% endblock %} | UniSchedule</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+{% block extra_head %}{% endblock %}
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo">
+        <div class="logo-box">🗓️</div>
+        <span>UniSchedule</span>
+      </div>
+      <div class="brand-tag">Smart Timetable Generator</div>
+    </div>
+
+    <nav class="sidebar-nav">
+      {% if session.get('role') == 'teacher' %}
+        <div class="nav-section-label">Overview</div>
+        <a href="{{ url_for('teacher_dashboard') }}" class="nav-item {% if request.endpoint == 'teacher_dashboard' %}active{% endif %}">
+          <span class="nav-icon">📊</span> Dashboard
+        </a>
+
+        <div class="nav-section-label">Manage</div>
+        <a href="{{ url_for('teacher_subjects') }}" class="nav-item {% if request.endpoint == 'teacher_subjects' %}active{% endif %}">
+          <span class="nav-icon">📚</span> Subjects
+        </a>
+        <a href="{{ url_for('teacher_teachers') }}" class="nav-item {% if request.endpoint == 'teacher_teachers' %}active{% endif %}">
+          <span class="nav-icon">👨‍🏫</span> Teachers
+        </a>
+        <a href="{{ url_for('teacher_classrooms') }}" class="nav-item {% if request.endpoint == 'teacher_classrooms' %}active{% endif %}">
+          <span class="nav-icon">🏫</span> Classrooms
+        </a>
+
+        <div class="nav-section-label">Timetable</div>
+        <a href="{{ url_for('teacher_timetable') }}" class="nav-item {% if request.endpoint == 'teacher_timetable' %}active{% endif %}">
+          <span class="nav-icon">📅</span> View &amp; Edit
+          <span class="nav-badge hidden" id="conflict-badge">0</span>
+        </a>
+        <a href="{{ url_for('export_pdf') }}" class="nav-item">
+          <span class="nav-icon">📄</span> Export PDF
+        </a>
+        <a href="{{ url_for('export_excel') }}" class="nav-item">
+          <span class="nav-icon">📊</span> Export Excel
+        </a>
+
+      {% else %}
+        <div class="nav-section-label">Overview</div>
+        <a href="{{ url_for('student_dashboard') }}" class="nav-item {% if request.endpoint == 'student_dashboard' %}active{% endif %}">
+          <span class="nav-icon">🏠</span> Dashboard
+        </a>
+        <a href="{{ url_for('student_timetable') }}" class="nav-item {% if request.endpoint == 'student_timetable' %}active{% endif %}">
+          <span class="nav-icon">📅</span> My Timetable
+        </a>
+        <a href="{{ url_for('student_export_pdf') }}" class="nav-item">
+          <span class="nav-icon">📄</span> Download PDF
+        </a>
+      {% endif %}
+
+      <div class="nav-section-label">Account</div>
+      <a href="#" class="nav-item" onclick="document.getElementById('profile-modal')?.classList.add('open')">
+        <span class="nav-icon">👤</span> Profile
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="user-avatar">{{ session.get('fullname', 'U')[0].upper() }}</div>
+        <div class="user-info">
+          <div class="user-name">{{ session.get('fullname', '') }}</div>
+          <div class="user-role">{{ session.get('role', '') }}</div>
+        </div>
+      </div>
+      <a href="{{ url_for('logout') }}" class="sidebar-logout">
+        <span>🚪</span> Logout
+      </a>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main-area">
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="topbar-left">
+        <button class="btn btn-outline btn-sm" id="menu-toggle" style="display:none">☰</button>
+        <span class="topbar-title">{% block topbar_title %}Dashboard{% endblock %}</span>
+      </div>
+      <div class="topbar-right">
+        <!-- Theme toggle -->
+        <div class="theme-toggle" id="theme-toggle" title="Toggle dark mode">
+          <div class="theme-toggle-dot"></div>
+        </div>
+        <span class="text-sm text-muted" style="display:flex;align-items:center;gap:6px">
+          <span>☀️</span>/<span>🌙</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Flash messages -->
+    <div style="padding:0 28px;padding-top:16px">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-messages">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ 'danger' if category == 'error' else category }}">
+                {{ message }}
+                <button class="alert-close">×</button>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+    </div>
+
+    <!-- Page content -->
+    <div class="page-content">
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+</div>
+
+<!-- Profile Modal -->
+<div class="modal-overlay" id="profile-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title">👤 My Profile</h3>
+      <button class="modal-close" onclick="closeModal('profile-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="profile-header" style="margin-bottom:0;border:none;padding:0;box-shadow:none">
+        <div class="profile-avatar">{{ session.get('fullname','U')[0].upper() }}</div>
+        <div>
+          <div class="profile-name">{{ session.get('fullname','') }}</div>
+          <div class="profile-email">{{ session.get('email','') }}</div>
+          <span class="badge badge-{{ 'indigo' if session.get('role')=='teacher' else 'violet' }}" style="margin-top:6px">
+            {{ session.get('role','').upper() }}
+          </span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm">Logout</a>
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('profile-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>
