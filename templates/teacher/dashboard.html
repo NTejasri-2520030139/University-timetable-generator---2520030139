@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+{% block title %}Teacher Dashboard{% endblock %}
+{% block topbar_title %}📊 Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="breadcrumb"><a href="{{ url_for('landing') }}">Home</a> › <span>Dashboard</span></div>
+  <h1>Good day, {{ session.get('fullname','').split()[0] }}! 👋</h1>
+  <p>Here's your timetable management overview</p>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-icon-box indigo">📚</div>
+    <div>
+      <div class="stat-value">{{ stats.total_subjects }}</div>
+      <div class="stat-label">Subjects</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon-box violet">👨‍🏫</div>
+    <div>
+      <div class="stat-value">{{ stats.total_teachers }}</div>
+      <div class="stat-label">Teachers</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon-box pink">🏫</div>
+    <div>
+      <div class="stat-value">{{ stats.total_classrooms }}</div>
+      <div class="stat-label">Classrooms</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon-box emerald">📅</div>
+    <div>
+      <div class="stat-value">{{ stats.total_entries }}</div>
+      <div class="stat-label">Scheduled Classes</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon-box {% if stats.conflicts > 0 %}red{% else %}emerald{% endif %}">
+      {% if stats.conflicts > 0 %}🚨{% else %}✅{% endif %}
+    </div>
+    <div>
+      <div class="stat-value" style="color:{% if stats.conflicts > 0 %}#ef4444{% else %}#10b981{% endif %}">{{ stats.conflicts }}</div>
+      <div class="stat-label">Conflicts</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon-box indigo">🕐</div>
+    <div>
+      <div class="stat-value">{{ stats.total_timeslots }}</div>
+      <div class="stat-label">Time Slots</div>
+    </div>
+  </div>
+</div>
+
+<!-- Conflict Banner -->
+{% if conflicts %}
+  <div style="margin-bottom:20px">
+    {% for c in conflicts[:3] %}
+    <div class="conflict-banner">
+      <div class="conflict-dot red"></div>
+      <div>
+        <strong>{{ c.type }}</strong><br>
+        <span style="font-size:.82rem;color:#ef4444">{{ c.detail }}</span>
+      </div>
+    </div>
+    {% endfor %}
+    {% if conflicts|length > 3 %}
+    <p style="font-size:.78rem;color:var(--text-muted);margin-top:6px">+ {{ conflicts|length - 3 }} more conflicts. <a href="{{ url_for('teacher_timetable') }}" style="color:var(--accent)">View timetable →</a></p>
+    {% endif %}
+  </div>
+{% else %}
+  <div class="conflict-banner no-conflict" style="margin-bottom:20px">
+    <div class="conflict-dot green"></div>
+    <div><strong style="color:#10b981">No Conflicts Detected</strong><br>
+    <span style="font-size:.82rem;color:#10b981">All scheduled classes are conflict-free ✅</span></div>
+  </div>
+{% endif %}
+
+<!-- Charts -->
+<div class="charts-grid">
+  <div class="chart-card">
+    <div class="chart-title">📅 Weekly Schedule Distribution</div>
+    <div class="bar-chart" id="chart-weekly"></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">👨‍🏫 Teacher Workload</div>
+    <div class="bar-chart" id="chart-workload"></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">🏫 Classroom Utilization</div>
+    <div class="bar-chart" id="chart-rooms"></div>
+  </div>
+</div>
+
+<!-- Recent Activity + Quick Actions -->
+<div class="grid-2">
+  <!-- Activity -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">🕐 Recent Activity</span>
+    </div>
+    <div class="card-body" style="padding:0 22px">
+      {% if activities %}
+      <div class="activity-list">
+        {% for a in activities %}
+        <div class="activity-item">
+          <div class="activity-dot" style="background:{% if 'GENERATE' in a.action %}#10b981{% elif 'DELETE' in a.action %}#ef4444{% else %}#6366f1{% endif %}"></div>
+          <div>
+            <div class="activity-text"><strong>{{ a.fullname }}</strong> — {{ a.action.replace('_',' ').title() }}
+              {% if a.detail %}<span style="color:var(--text-muted)"> · {{ a.detail[:40] }}</span>{% endif %}
+            </div>
+            <div class="activity-time">{{ a.timestamp }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p style="color:var(--text-muted);font-size:.84rem;padding:20px 0;text-align:center">No activity yet</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="card">
+    <div class="card-header"><span class="card-title">⚡ Quick Actions</span></div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+      <a href="{{ url_for('teacher_timetable') }}" class="btn btn-primary" style="justify-content:center">
+        🗓️ View &amp; Generate Timetable
+      </a>
+      <a href="{{ url_for('teacher_subjects') }}" class="btn btn-secondary" style="justify-content:center">
+        📚 Manage Subjects
+      </a>
+      <a href="{{ url_for('teacher_teachers') }}" class="btn btn-secondary" style="justify-content:center">
+        👨‍🏫 Manage Teachers
+      </a>
+      <a href="{{ url_for('teacher_classrooms') }}" class="btn btn-secondary" style="justify-content:center">
+        🏫 Manage Classrooms
+      </a>
+      <a href="{{ url_for('export_pdf') }}" class="btn btn-success" style="justify-content:center">
+        📄 Export PDF
+      </a>
+      <a href="{{ url_for('export_excel') }}" class="btn btn-warning" style="justify-content:center">
+        📊 Export Excel
+      </a>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const weeklyData = {{ weekly | tojson }};
+const workloadData = {{ workload | tojson }};
+const roomData = {{ classroom_util | tojson }};
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderBarChart('chart-weekly', weeklyData, 'day', 'count');
+  renderBarChart('chart-workload', workloadData, 'teacher_name', 'cnt');
+  renderBarChart('chart-rooms', roomData, 'room_number', 'used');
+});
+</script>
+{% endblock %}

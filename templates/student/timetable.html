@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% block title %}My Timetable{% endblock %}
+{% block topbar_title %}📅 My Timetable{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div class="breadcrumb"><a href="{{ url_for('student_dashboard') }}">Dashboard</a> › <span>Timetable</span></div>
+  <h1>University Timetable</h1>
+  <p>Search, filter, and download your class schedule</p>
+</div>
+
+<!-- Filters -->
+<div class="card" style="margin-bottom:20px">
+  <div class="card-body">
+    <div class="filters-bar">
+      <div class="search-box" style="flex:2;min-width:220px">
+        <span class="search-icon">🔍</span>
+        <input class="form-control" type="text" id="tt-search" placeholder="Search subject, teacher, room...">
+      </div>
+      <select class="form-control" id="filter-teacher" style="width:auto;min-width:160px">
+        <option value="">All Teachers</option>
+        {% for t in teachers %}<option value="{{ t.teacher_name.lower() }}">{{ t.teacher_name }}</option>{% endfor %}
+      </select>
+      <select class="form-control" id="filter-subject" style="width:auto;min-width:160px">
+        <option value="">All Subjects</option>
+        {% for s in subjects %}<option value="{{ s.subject_name.lower() }}">{{ s.subject_name }}</option>{% endfor %}
+      </select>
+      <select class="form-control" id="filter-day" style="width:auto;min-width:130px">
+        <option value="">All Days</option>
+        {% for d in days %}<option value="{{ d.lower() }}">{{ d }}</option>{% endfor %}
+      </select>
+      <a href="{{ url_for('student_export_pdf') }}" class="btn btn-success btn-sm">📄 PDF</a>
+    </div>
+  </div>
+</div>
+
+<!-- Grid View -->
+{% if entries %}
+<div class="card" style="margin-bottom:20px">
+  <div class="card-header"><span class="card-title">📅 Schedule Grid</span><span class="badge badge-indigo">{{ entries|length }} classes</span></div>
+  <div class="card-body" style="padding:0">
+    <div class="tt-wrapper"><div class="tt-grid" id="tt-grid"></div></div>
+  </div>
+</div>
+
+<!-- Table View -->
+<div class="card">
+  <div class="card-header"><span class="card-title">📋 Detailed View</span></div>
+  <div class="card-body" style="padding:0">
+    <div class="table-responsive">
+      <table class="table">
+        <thead><tr><th>Subject</th><th>Teacher</th><th>Room</th><th>Day</th><th>Time</th></tr></thead>
+        <tbody>
+          {% for e in entries %}
+          <tr>
+            <td><strong>{{ e.subject_name }}</strong><br><span class="text-xs text-muted">{{ e.credits }} credits</span></td>
+            <td>{{ e.teacher_name }}<br><span class="text-xs badge badge-violet">{{ e.specialization }}</span></td>
+            <td>{{ e.room_number }}</td>
+            <td><span class="badge badge-indigo">{{ e.day }}</span></td>
+            <td>{{ e.start_time }} – {{ e.end_time }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<div class="card">
+  <div class="card-body" style="text-align:center;padding:60px">
+    <div style="font-size:3rem;margin-bottom:14px">📭</div>
+    <h3>No Timetable Available</h3>
+    <p style="color:var(--text-muted);margin-top:8px">The timetable hasn't been generated yet. Please check back soon!</p>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+{% block extra_js %}
+<script>
+const ttEntries = {{ entries | tojson }};
+const ttDays = {{ days | tojson }};
+
+// Build unique timeslots from entries
+const ttSlots = [];
+const seen = new Set();
+ttEntries.forEach(e => {
+  const key = e.start_time + '|' + e.end_time;
+  if (!seen.has(key)) { seen.add(key); ttSlots.push({start_time: e.start_time, end_time: e.end_time}); }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (ttEntries.length) buildTimetableGrid(ttEntries, ttDays, ttSlots);
+});
+</script>
+{% endblock %}

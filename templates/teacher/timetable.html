@@ -1,0 +1,240 @@
+{% extends 'base.html' %}
+{% block title %}Timetable{% endblock %}
+{% block topbar_title %}📅 Timetable{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="breadcrumb"><a href="{{ url_for('teacher_dashboard') }}">Dashboard</a> › <span>Timetable</span></div>
+  <h1>Timetable Manager</h1>
+  <p>Generate, view, edit, and export the university schedule</p>
+</div>
+
+<!-- CSP Generation Panel -->
+<div class="card" style="margin-bottom:22px;border-color:rgba(99,102,241,.25);background:linear-gradient(135deg,rgba(99,102,241,.05),rgba(168,85,247,.03))">
+  <div class="card-header">
+    <span class="card-title">🧠 CSP Solver — CO3 Algorithms</span>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <form action="{{ url_for('clear_timetable') }}" method="POST" onsubmit="return confirm('Clear all entries?')">
+        <button type="submit" class="btn btn-danger btn-sm">🗑️ Clear All</button>
+      </form>
+      <a href="{{ url_for('export_pdf') }}" class="btn btn-secondary btn-sm">📄 PDF</a>
+      <a href="{{ url_for('export_excel') }}" class="btn btn-secondary btn-sm">📊 Excel</a>
+    </div>
+  </div>
+  <div class="card-body">
+    <!-- Heuristic pills -->
+    <div class="heuristic-pills">
+      <div class="h-pill"><div class="h-dot" style="background:#6366f1"></div>Backtracking</div>
+      <div class="h-pill"><div class="h-dot" style="background:#8b5cf6"></div>AC-3 Propagation</div>
+      <div class="h-pill"><div class="h-dot" style="background:#ec4899"></div>MRV Heuristic</div>
+      <div class="h-pill"><div class="h-dot" style="background:#10b981"></div>Degree Heuristic</div>
+      <div class="h-pill"><div class="h-dot" style="background:#f59e0b"></div>LCV Ordering</div>
+    </div>
+
+    <!-- CSP Progress Steps -->
+    <div class="hidden" id="csp-progress" style="margin-bottom:16px">
+      <div style="font-size:.78rem;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Solving...</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        {% for step in ['Initializing variables & domains','Running AC-3 preprocessing','MRV + Degree variable selection','LCV value ordering','Backtracking search','Evaluating solution quality'] %}
+        <div class="csp-step" style="font-size:.78rem;padding:6px 12px;border-radius:6px;background:var(--bg-card2);color:var(--text-muted);transition:all .3s;padding-left:28px;position:relative">
+          <span style="position:absolute;left:10px">○</span> {{ step }}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-primary btn-generate" id="btn-generate">
+        <span class="shimmer"></span>
+        🧠 Solve CSP &amp; Generate Timetable
+      </button>
+      <span style="font-size:.78rem;color:var(--text-muted)">
+        {{ entries|length }} entries &bull;
+        <span style="color:{% if conflicts %}#ef4444{% else %}#10b981{% endif %}">
+          {% if conflicts %}🔴 {{ conflicts|length }} conflict(s){% else %}🟢 No conflicts{% endif %}
+        </span>
+      </span>
+    </div>
+
+    <!-- Metrics Panel (filled by JS after generation) -->
+    <div class="metrics-panel" id="metrics-panel" style="margin-top:16px;display:{% if entries %}grid{% else %}none{% endif %}">
+      <div class="metric-item"><div class="metric-val" id="met-time">—</div><div class="metric-lbl">Solve (ms)</div></div>
+      <div class="metric-item"><div class="metric-val" id="met-backtracks">—</div><div class="metric-lbl">Backtracks</div></div>
+      <div class="metric-item"><div class="metric-val" id="met-checks">—</div><div class="metric-lbl">CSP Checks</div></div>
+      <div class="metric-item"><div class="metric-val" id="met-vars">—</div><div class="metric-lbl">Variables</div></div>
+      <div class="metric-item"><div class="metric-val" id="met-constraints">—</div><div class="metric-lbl">Constraints</div></div>
+      <div class="metric-item"><div class="metric-val" id="met-quality">—</div><div class="metric-lbl">Quality %</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Manual Entry -->
+<div class="card" style="margin-bottom:22px">
+  <div class="card-header">
+    <span class="card-title">➕ Add Manual Entry</span>
+    <button class="btn btn-outline btn-sm" onclick="openModal('add-entry-modal')">+ Add Entry</button>
+  </div>
+</div>
+
+<!-- Conflict List -->
+{% if conflicts %}
+<div class="card" style="margin-bottom:22px">
+  <div class="card-header"><span class="card-title">🚨 Conflicts Detected ({{ conflicts|length }})</span></div>
+  <div class="card-body" style="padding:0 22px">
+    {% for c in conflicts %}
+    <div class="conflict-banner" style="margin-bottom:8px">
+      <div class="conflict-dot red"></div>
+      <div>
+        <span class="badge badge-danger">{{ c.type }}</span>
+        <p style="font-size:.82rem;margin-top:4px;color:var(--text-primary)">{{ c.detail }}</p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Filters -->
+<div class="card" style="margin-bottom:22px">
+  <div class="card-body">
+    <div class="filters-bar">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input class="form-control" type="text" id="tt-search" placeholder="Search subject, teacher, room...">
+      </div>
+      <select class="form-control" id="filter-teacher" style="width:auto;min-width:150px">
+        <option value="">All Teachers</option>
+        {% for t in teachers %}<option value="{{ t.teacher_name.lower() }}">{{ t.teacher_name }}</option>{% endfor %}
+      </select>
+      <select class="form-control" id="filter-day" style="width:auto;min-width:130px">
+        <option value="">All Days</option>
+        {% for d in days %}<option value="{{ d.lower() }}">{{ d }}</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Timetable Grid -->
+<div class="card">
+  <div class="card-header"><span class="card-title">📅 Schedule Grid</span></div>
+  <div class="card-body" style="padding:0">
+    {% if entries %}
+    <div class="tt-wrapper">
+      <div class="tt-grid" id="tt-grid"></div>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:48px;color:var(--text-muted)">
+      <div style="font-size:3rem;margin-bottom:12px">📭</div>
+      <p>No timetable entries yet. Click <strong>Solve CSP & Generate Timetable</strong> to get started!</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Timetable Table (also shown below grid) -->
+{% if entries %}
+<div class="card" style="margin-top:22px">
+  <div class="card-header"><span class="card-title">📋 All Entries</span></div>
+  <div class="card-body" style="padding:0">
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Subject</th><th>Teacher</th><th>Room</th>
+            <th>Day</th><th>Time</th><th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in entries %}
+          <tr>
+            <td><strong>{{ e.subject_name }}</strong><br><span class="text-xs text-muted">{{ e.credits }} credits</span></td>
+            <td>{{ e.teacher_name }}<br><span class="text-xs text-muted">{{ e.specialization }}</span></td>
+            <td>{{ e.room_number }}</td>
+            <td>{{ e.day }}</td>
+            <td>{{ e.start_time }} – {{ e.end_time }}</td>
+            <td>
+              <form method="POST" action="{{ url_for('delete_timetable_entry', entry_id=e.id) }}" onsubmit="return confirm('Delete this entry?')" style="display:inline">
+                <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Add Entry Modal -->
+<div class="modal-overlay" id="add-entry-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title">➕ Add Timetable Entry</h3>
+      <button class="modal-close" onclick="closeModal('add-entry-modal')">×</button>
+    </div>
+    <form method="POST" action="{{ url_for('add_timetable_entry') }}">
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Subject</label>
+        <select class="form-control" name="subject_id" required>
+          <option value="">Select subject...</option>
+          {% for s in subjects %}<option value="{{ s.id }}">{{ s.subject_name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Teacher</label>
+        <select class="form-control" name="teacher_id" required>
+          <option value="">Select teacher...</option>
+          {% for t in teachers %}<option value="{{ t.id }}">{{ t.teacher_name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Classroom</label>
+        <select class="form-control" name="classroom_id" required>
+          <option value="">Select room...</option>
+          {% for c in classrooms %}<option value="{{ c.id }}">{{ c.room_number }} (Cap: {{ c.capacity }})</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Time Slot</label>
+        <select class="form-control" name="timeslot_id" required>
+          <option value="">Select timeslot...</option>
+          {% for ts in timeslots %}<option value="{{ ts.id }}">{{ ts.day }} · {{ ts.start_time }}–{{ ts.end_time }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeModal('add-entry-modal')">Cancel</button>
+      <button type="submit" class="btn btn-primary">Add Entry</button>
+    </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const ttEntries = {{ entries | tojson }};
+const ttDays = {{ days | tojson }};
+const ttSlots = {{ timeslots | tojson }};
+const conflictIds = {{ conflict_ids | list | tojson }};
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (ttEntries.length) {
+    buildTimetableGrid(ttEntries, ttDays, ttSlots, conflictIds);
+  }
+});
+
+// Style CSP steps
+const style = document.createElement('style');
+style.textContent = `
+  .csp-step.active { background:rgba(99,102,241,.1) !important; color:#818cf8 !important; }
+  .csp-step.active span { color:#818cf8 !important; }
+  .csp-step.done { background:rgba(16,185,129,.08) !important; color:#10b981 !important; }
+  .csp-step.done span::before { content:'✓' !important; }
+`;
+document.head.appendChild(style);
+</script>
+{% endblock %}

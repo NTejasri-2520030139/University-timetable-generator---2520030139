@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% block title %}Student Dashboard{% endblock %}
+{% block topbar_title %}🏠 Dashboard{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div class="breadcrumb"><span>Student</span> › <span>Dashboard</span></div>
+  <h1>Welcome, {{ session.get('fullname','').split()[0] }}! 🎓</h1>
+  <p>Today is <strong>{{ today }}</strong> — here are your classes</p>
+</div>
+
+<!-- Today's Classes -->
+<div class="card" style="margin-bottom:22px;border-color:rgba(99,102,241,.25)">
+  <div class="card-header">
+    <span class="card-title">📅 Today's Classes — {{ today }}</span>
+    <span class="badge badge-{% if today_classes %}indigo{% else %}warning{% endif %}">
+      {{ today_classes|length }} class{{ 'es' if today_classes|length != 1 else '' }}
+    </span>
+  </div>
+  <div class="card-body">
+    {% if today_classes %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">
+      {% for c in today_classes %}
+      <div style="padding:16px;background:var(--bg-card2);border-radius:var(--radius-md);border:1px solid var(--border);border-left:3px solid #6366f1;transition:all .2s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+        <div style="font-weight:700;font-size:.92rem;margin-bottom:8px">{{ c.subject_name }}</div>
+        <div style="font-size:.78rem;color:var(--text-muted);display:flex;flex-direction:column;gap:3px">
+          <span>👨‍🏫 {{ c.teacher_name }}</span>
+          <span>🏫 {{ c.room_number }}</span>
+          <span>🕐 {{ c.start_time }} – {{ c.end_time }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:32px;color:var(--text-muted)">
+      <div style="font-size:2.5rem;margin-bottom:10px">☀️</div>
+      <p>No classes scheduled for today. Enjoy your free day!</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Weekly Overview (mini grid) -->
+<div class="card" style="margin-bottom:22px">
+  <div class="card-header">
+    <span class="card-title">📆 Weekly Overview</span>
+    <a href="{{ url_for('student_timetable') }}" class="btn btn-secondary btn-sm">View Full →</a>
+  </div>
+  <div class="card-body" style="padding:0">
+    {% if all_entries %}
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:0;overflow-x:auto;min-width:600px">
+      {% for day in days %}
+      <div>
+        <div style="text-align:center;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);padding:12px 8px;background:var(--bg-card2);border-bottom:1px solid var(--border)">
+          {{ day[:3] }}
+        </div>
+        <div style="padding:8px;min-height:80px">
+          {% set day_entries = all_entries | selectattr('day','equalto',day) | list %}
+          {% for e in day_entries[:3] %}
+          <div style="background:rgba(99,102,241,.1);border-left:2px solid #6366f1;border-radius:4px;padding:4px 7px;margin-bottom:4px;font-size:.68rem;font-weight:600;color:#6366f1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            {{ e.subject_name }}
+          </div>
+          {% endfor %}
+          {% if day_entries|length > 3 %}<div style="font-size:.65rem;color:var(--text-muted);text-align:center">+{{ day_entries|length - 3 }} more</div>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:40px;color:var(--text-muted)">
+      <div style="font-size:2rem;margin-bottom:10px">📭</div>
+      <p>No timetable available yet. Check back later!</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Quick Links -->
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header"><span class="card-title">⚡ Quick Actions</span></div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+      <a href="{{ url_for('student_timetable') }}" class="btn btn-primary" style="justify-content:center">📅 View Full Timetable</a>
+      <a href="{{ url_for('student_export_pdf') }}" class="btn btn-success" style="justify-content:center">📄 Download PDF</a>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><span class="card-title">📊 This Week</span></div>
+    <div class="card-body">
+      {% for day in days %}
+      {% set cnt = all_entries | selectattr('day','equalto',day) | list | length %}
+      <div class="bar-row" style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span style="font-size:.75rem;color:var(--text-muted);width:80px">{{ day[:3] }}</span>
+        <div style="flex:1;height:8px;background:var(--bg-card2);border-radius:100px;overflow:hidden">
+          <div style="height:100%;border-radius:100px;background:linear-gradient(90deg,#6366f1,#a855f7);width:{{ [cnt * 20, 100]|min }}%;transition:width 1s ease"></div>
+        </div>
+        <span style="font-size:.72rem;font-weight:700;color:var(--text-muted)">{{ cnt }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
